@@ -1,6 +1,15 @@
-# Winter Arc : installation sur iPhone (environ 10 minutes, une seule fois)
+# Winter Arc
 
-## 1. Mettre l'app en ligne (GitHub Pages, gratuit)
+**App en ligne : https://cxssxdrx.github.io/winter-arc/**
+Ouvre ce lien dans Safari, puis Partager → Sur l'écran d'accueil.
+
+Le site est servi depuis la branche `gh-pages`. Une mise à jour doit être poussée sur `main` **et** sur `gh-pages`.
+
+---
+
+## Guide complet
+
+## 1. Mise en ligne (déjà faite)
 1. Crée un compte sur github.com si tu n'en as pas.
 2. Clique sur **New repository**, nomme-le `winter-arc`, choisis **Public**, puis **Create repository**.
 3. Clique sur **uploading an existing file** et glisse **tout le contenu** du dossier : `index.html`, `manifest.webmanifest`, `sw.js` et le dossier `icons`. Valide avec **Commit changes**.
@@ -27,4 +36,4 @@ L'app lit tes données Garmin via **Intervals.icu**, qui est déjà relié à ta
 - **Sauvegarde** : dans Réglages, choisis Exporter, puis enregistre le fichier dans Fichiers ou iCloud Drive. Fais-le environ une fois par semaine. Supprimer l'app de l'écran d'accueil efface ses données.
 
 ## Mettre l'app à jour
-Remplace `index.html` dans le dépôt GitHub. L'app récupère la nouvelle version à la prochaine ouverture (ferme-la et rouvre-la deux fois).
+Remplace `index.html` sur les branches `main` et `gh-pages`. L'app récupère la nouvelle version à la prochaine ouverture (ferme-la et rouvre-la deux fois).
