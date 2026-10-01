@@ -1,0 +1,910 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Winter Arc</title>
+<meta name="description" content="Suivi du Winter Arc : habitudes, score de forme Garmin, chrono de travail.">
+<meta name="theme-color" content="#07090c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Winter Arc">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#07090c; --s1:#0d1218; --s2:#131a22; --s3:#1a232e; --line:#1f2a36;
+  --tx:#eaf1f8; --tx2:#a3b0bf; --mute:#64717f;
+  --ice:#7fd8ff; --ice2:#3aa8e0; --iceDim:rgba(127,216,255,.12);
+  --good:#3ddc84; --warn:#ffa630; --bad:#ff5470;
+  --r:18px;
+  --safeT:env(safe-area-inset-top,0px); --safeB:env(safe-area-inset-bottom,0px);
+  --cond:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
+  --sans:'Barlow',-apple-system,system-ui,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--sans);font-size:15px;line-height:1.35}
+body{min-height:100vh;touch-action:manipulation;overscroll-behavior-y:none;
+  background:radial-gradient(120% 60% at 50% -10%,rgba(58,168,224,.16),transparent 60%),var(--bg);background-attachment:fixed}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+input,select{font:inherit;color:var(--tx);background:var(--s2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;width:100%;outline:none}
+input:focus,select:focus{border-color:var(--ice2)}
+.num{font-family:var(--cond);font-weight:700;letter-spacing:.01em;font-variant-numeric:tabular-nums}
+.lbl{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.muted{color:var(--tx2)} .dim{color:var(--mute)}
+
+/* layout */
+#app{max-width:520px;margin:0 auto;padding:calc(var(--safeT) + 10px) 16px calc(var(--safeB) + 96px)}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0 14px}
+.brand{display:flex;flex-direction:column}
+.brand .t{font-family:var(--cond);font-weight:800;font-size:13px;letter-spacing:.32em;color:var(--ice)}
+.brand .d{font-family:var(--cond);font-weight:800;font-size:30px;line-height:1;letter-spacing:.02em;text-transform:uppercase}
+.brand .d small{font-size:18px;color:var(--mute);font-weight:700}
+.topR{display:flex;align-items:center;gap:8px}
+.sync{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tx2);background:var(--s1);border:1px solid var(--line);padding:7px 10px;border-radius:999px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--mute);flex:none}
+.dot.ok{background:var(--good);box-shadow:0 0 8px var(--good)} .dot.busy{background:var(--ice);animation:pulse 1s infinite} .dot.err{background:var(--bad)}
+@keyframes pulse{50%{opacity:.3}}
+.iconbtn{width:38px;height:38px;border-radius:12px;background:var(--s1);border:1px solid var(--line);display:grid;place-items:center}
+.iconbtn svg{width:19px;height:19px;stroke:var(--tx2)}
+
+.card{background:linear-gradient(180deg,var(--s1),#0b1015);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:12px}
+.card h3{margin:0 0 12px;display:flex;justify-content:space-between;align-items:baseline}
+.row{display:flex;align-items:center;gap:12px}
+.between{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{background:var(--s2);border:1px solid var(--line);border-radius:14px;padding:12px}
+.stat .v{font-family:var(--cond);font-weight:700;font-size:28px;line-height:1.05}
+.stat .v small{font-size:15px;color:var(--tx2);font-weight:600}
+.stat .s{font-size:12px;color:var(--tx2);margin-top:2px}
+
+/* progress */
+.bar{height:6px;background:var(--s3);border-radius:99px;overflow:hidden}
+.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--ice2),var(--ice));border-radius:99px}
+
+/* form ring */
+.form{display:flex;gap:16px;align-items:center}
+.ring{position:relative;width:108px;height:108px;flex:none}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring .c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring .c .v{font-family:var(--cond);font-weight:800;font-size:44px;line-height:1}
+.ring .c .u{font-size:10px;letter-spacing:.16em;color:var(--mute);font-weight:700}
+.zone{display:inline-flex;align-items:center;gap:6px;font-family:var(--cond);font-weight:800;font-size:18px;text-transform:uppercase;letter-spacing:.05em}
+.parts{margin-top:14px;display:grid;gap:7px;padding-top:12px;border-top:1px solid var(--line)}
+.part{display:grid;grid-template-columns:100px 1fr;gap:8px;font-size:13.5px;align-items:center}
+.part .k{color:var(--mute);font-weight:600}
+.reco{margin-top:12px;padding:11px 12px;border-radius:12px;background:var(--s2);border-left:3px solid var(--ice);font-size:14px}
+.reco.warn{border-left-color:var(--warn)} .reco.bad{border-left-color:var(--bad)} .reco.good{border-left-color:var(--good)}
+
+/* alerts */
+.alert{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:14px;margin-bottom:12px;font-size:14px;border:1px solid}
+.alert.warn{background:rgba(255,166,48,.08);border-color:rgba(255,166,48,.35)}
+.alert.bad{background:rgba(255,84,112,.08);border-color:rgba(255,84,112,.4)}
+.alert.info{background:var(--iceDim);border-color:rgba(127,216,255,.3)}
+.alert b{font-weight:700}
+.alert .ic{font-family:var(--cond);font-weight:800;font-size:16px;line-height:1.2}
+
+/* habits */
+.dayhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;font-family:var(--cond);font-weight:800;font-size:15px;letter-spacing:.04em;border:1px solid var(--line);background:var(--s2)}
+.pill .sw{width:9px;height:9px;border-radius:3px}
+.habits{display:grid;gap:8px}
+.h{position:relative;display:flex;align-items:center;gap:12px;padding:12px 12px;border-radius:14px;background:var(--s2);border:1px solid var(--line);text-align:left;width:100%;overflow:hidden;min-height:60px;transition:transform .08s,background .2s,border-color .2s}
+.h:active{transform:scale(.985)}
+.h.done{background:linear-gradient(90deg,rgba(127,216,255,.13),rgba(127,216,255,.04));border-color:rgba(127,216,255,.35)}
+.h.prio:not(.done){border-color:rgba(255,166,48,.55)}
+.chk{width:28px;height:28px;border-radius:50%;border:2px solid var(--mute);flex:none;display:grid;place-items:center}
+.h.done .chk{background:var(--ice);border-color:var(--ice)}
+.chk svg{width:16px;height:16px;stroke:#06131b;stroke-width:3.4;opacity:0}
+.h.done .chk svg{opacity:1}
+.h .m{flex:1;min-width:0}
+.h .n{font-weight:700;font-size:15.5px}
+.h .sub{font-size:12.5px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag{font-size:9.5px;font-weight:800;letter-spacing:.14em;padding:3px 6px;border-radius:6px;background:var(--s3);color:var(--tx2);flex:none}
+.tag.g{color:var(--ice);background:var(--iceDim)}
+.tag.p{color:var(--warn);background:rgba(255,166,48,.12)}
+.h .prog{position:absolute;left:0;bottom:0;height:3px;background:linear-gradient(90deg,var(--ice2),var(--ice));opacity:.8}
+.water{display:flex;gap:6px;flex:none}
+.wbtn{height:38px;min-width:38px;padding:0 10px;border-radius:11px;background:var(--s3);border:1px solid var(--line);font-family:var(--cond);font-weight:800;font-size:16px}
+.wbtn.plus{background:var(--ice);color:#06131b;border-color:var(--ice)}
+
+/* chrono */
+.chrono .time{font-family:var(--cond);font-weight:800;font-size:56px;line-height:1;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.chrono .time.run{color:var(--ice);text-shadow:0 0 24px rgba(127,216,255,.35)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}
+.chip{padding:7px 12px;border-radius:999px;background:var(--s2);border:1px solid var(--line);font-size:13px;font-weight:600;color:var(--tx2)}
+.chip.on{background:var(--iceDim);border-color:var(--ice);color:var(--ice)}
+.btns{display:flex;gap:8px}
+.btn{flex:1;height:50px;border-radius:14px;font-family:var(--cond);font-weight:800;font-size:18px;letter-spacing:.08em;text-transform:uppercase;background:var(--s3);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;gap:8px}
+.btn.pri{background:linear-gradient(180deg,#9be2ff,var(--ice));color:#06131b;border-color:var(--ice)}
+.btn.dng{color:var(--bad);border-color:rgba(255,84,112,.4)}
+.btn.sm{height:42px;font-size:15px}
+.btns[style*="column"] .btn{flex:none;width:100%}
+.btn:disabled{opacity:.4}
+
+/* calendar */
+.cal{display:grid;grid-template-columns:30px repeat(7,1fr);gap:5px}
+.cal .hd{font-size:10px;font-weight:700;color:var(--mute);text-align:center;letter-spacing:.1em}
+.cal .ml{font-size:9.5px;font-weight:800;color:var(--mute);letter-spacing:.1em;align-self:center}
+.cell{aspect-ratio:1;border-radius:8px;background:var(--s2);border:1px solid transparent;position:relative;display:flex;align-items:flex-end;justify-content:flex-end;padding:3px 5px;font-family:var(--cond);font-weight:700;font-size:13px;color:rgba(0,0,0,.65)}
+.cell .dn{position:absolute;top:3px;left:5px;font-size:10px;font-weight:700;color:var(--mute)}
+.cell.out{background:transparent}
+.cell.fut{background:transparent;border-color:var(--line)}
+.cell.g{background:var(--good)} .cell.o{background:var(--warn)} .cell.r{background:var(--bad)}
+.cell.g .dn,.cell.o .dn,.cell.r .dn{color:rgba(0,0,0,.55)}
+.cell.today{outline:2px solid var(--ice);outline-offset:2px}
+.cell.live{background:var(--s3);color:var(--tx2)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:var(--tx2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+
+/* charts */
+.chart{position:relative}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.tip{position:absolute;pointer-events:none;background:#000c;border:1px solid var(--line);backdrop-filter:blur(6px);border-radius:10px;padding:7px 9px;font-size:12px;white-space:nowrap;transform:translate(-50%,-100%);display:none;z-index:3}
+.hbars{display:grid;gap:9px}
+.hb{display:grid;grid-template-columns:118px 1fr 62px;gap:10px;align-items:center;font-size:13px}
+.hb .tr{height:8px;background:var(--s3);border-radius:99px;overflow:hidden}
+.hb .tr i{display:block;height:100%;border-radius:99px;background:var(--ice)}
+.hb .p{white-space:nowrap;text-align:right;font-family:var(--cond);font-weight:700;font-size:15px}
+
+/* week dots */
+.wk{display:grid;grid-template-columns:118px repeat(7,1fr) 36px;gap:5px;align-items:center;font-size:13px}
+.wk .wd{height:20px;border-radius:6px;background:var(--s3)}
+.wk .wd.y{background:var(--ice)} .wk .wd.n{background:transparent;border:1.5px solid rgba(255,84,112,.6)} .wk .wd.f{background:transparent;border:1px dashed var(--line)}
+.wk .p{text-align:right;font-family:var(--cond);font-weight:700}
+.wkhd{font-size:10px;color:var(--mute);text-align:center;font-weight:700}
+.verdict{display:grid;gap:8px}
+.vline{display:flex;gap:10px;font-size:14px;padding:10px 12px;background:var(--s2);border-radius:12px;border:1px solid var(--line)}
+.vline .ic{font-family:var(--cond);font-weight:800;width:18px;text-align:center;flex:none}
+
+/* work */
+.mile{display:flex;gap:6px;margin-top:12px}
+.mile div{flex:1;text-align:center;padding:8px 0;border-radius:10px;background:var(--s2);border:1px solid var(--line);font-family:var(--cond);font-weight:800;font-size:15px;color:var(--mute)}
+.mile div.on{background:var(--iceDim);border-color:var(--ice);color:var(--ice)}
+.sess{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line);width:100%;text-align:left}
+.sess:last-child{border-bottom:0}
+.sess .d{flex:1}
+.sess .v{font-family:var(--cond);font-weight:700;font-size:18px}
+
+/* tabs */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:rgba(9,12,16,.88);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-top:1px solid var(--line);padding:6px 8px calc(var(--safeB) + 6px)}
+nav.tabs .in{max-width:520px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+nav.tabs button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+nav.tabs svg{width:23px;height:23px;stroke:currentColor}
+nav.tabs button.on{color:var(--ice)}
+nav.tabs .run{position:relative}
+nav.tabs .run::after{content:"";position:absolute;top:4px;right:calc(50% - 16px);width:7px;height:7px;border-radius:50%;background:var(--ice);box-shadow:0 0 8px var(--ice)}
+
+/* sheet */
+#ov{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:40;display:none;align-items:flex-end;justify-content:center}
+#ov.on{display:flex}
+#sheet{width:100%;max-width:520px;max-height:88vh;overflow:auto;background:var(--s1);border:1px solid var(--line);border-bottom:0;border-radius:22px 22px 0 0;padding:10px 16px calc(var(--safeB) + 20px);animation:up .22s ease-out}
+@keyframes up{from{transform:translateY(40px);opacity:0}}
+#sheet .grab{width:40px;height:5px;border-radius:9px;background:var(--s3);margin:2px auto 12px}
+#sheet h2{font-family:var(--cond);font-weight:800;font-size:26px;text-transform:uppercase;margin:0 0 4px;letter-spacing:.02em}
+.field{margin:14px 0}
+.field label{display:block;margin-bottom:6px}
+.help{font-size:12.5px;color:var(--tx2);margin-top:6px}
+#toast{position:fixed;left:50%;bottom:calc(var(--safeB) + 86px);transform:translateX(-50%);background:var(--s3);border:1px solid var(--line);padding:10px 16px;border-radius:12px;font-size:14px;z-index:60;display:none;max-width:90vw;text-align:center}
+
+/* onboarding */
+.hero{text-align:center;padding:40px 4px 10px}
+.hero h1{font-family:var(--cond);font-weight:800;font-size:52px;line-height:.95;margin:16px 0 8px;text-transform:uppercase;letter-spacing:.01em}
+.hero h1 span{color:var(--ice)}
+.hero img{width:96px;height:96px;border-radius:22px;box-shadow:0 10px 40px rgba(58,168,224,.3)}
+.demo-band{background:var(--warn);color:#1a1000;text-align:center;font-weight:700;font-size:12px;padding:6px;border-radius:10px;margin-bottom:12px;letter-spacing:.04em}
+.sec{margin:22px 0 10px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<nav class="tabs" id="tabs" hidden>
+  <div class="in">
+    <button data-a="tab" data-t="today"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".6" fill="currentColor"/></svg>Jour</button>
+    <button data-a="tab" data-t="arc"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M3.5 17a8.5 8.5 0 0 1 17 0"/><path d="M12 17l4-5"/><path d="M2 20h20"/></svg>Arc</button>
+    <button data-a="tab" data-t="week"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M5 20V11M10 20V5M15 20v-7M20 20V9"/></svg>Bilan</button>
+    <button data-a="tab" data-t="work"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M9.5 2.5h5M19 6l-1.5 1.5"/></svg>Travail</button>
+  </div>
+</nav>
+<div id="ov" data-a="closeov"><div id="sheet" data-stop="1"></div></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* =========================================================
+   WINTER ARC — 1er octobre → 31 décembre 2026 (92 jours)
+   Données : localStorage du téléphone. Garmin via Intervals.icu (API v1).
+   ========================================================= */
+const ARC_START = '2026-10-01', ARC_END = '2026-12-31';
+const STORE = 'winterarc.v1';
+const MILESTONES = [10, 25, 50, 100, 150];
+const HABITS = [
+  { id: 'sport', n: 'Sport', auto: true },
+  { id: 'steps', n: '10 000 pas', auto: true },
+  { id: 'sleep', n: 'Sommeil ≥ 7 h 30', auto: true },
+  { id: 'water', n: 'Eau 1,5 L', counter: true },
+  { id: 'supps', n: 'Compléments' },
+  { id: 'chore', n: '1 tâche ménagère' },
+  { id: 'room',  n: 'Ranger la chambre' },
+  { id: 'me',    n: '5–15 min pour soi' },
+];
+const HN = Object.fromEntries(HABITS.map(h => [h.id, h.n]));
+const SLEEP_MIN = 7.5 * 3600, STEPS_MIN = 10000, SPORT_MIN = 20, WATER_MIN = 1500;
+const ACT_FR = { Run:'Course', TrailRun:'Trail', VirtualRun:'Course tapis', Ride:'Vélo', VirtualRide:'Home trainer', GravelRide:'Gravel', MountainBikeRide:'VTT',
+  WeightTraining:'Muscu', Workout:'Entraînement', Crossfit:'Fonctionnel', HighIntensityIntervalTraining:'HIIT', Walk:'Marche', Hike:'Rando', Swim:'Natation',
+  Rowing:'Rameur', Elliptical:'Elliptique', Yoga:'Yoga', Pilates:'Pilates', StairStepper:'Stepper', Other:'Activité' };
+
+/* ---------- dates ---------- */
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return ymd(d); };
+const diffDays = (a, b) => Math.round((parse(b) - parse(a)) / 864e5);
+const weekStart = s => { const d = parse(s); const wd = (d.getDay() + 6) % 7; d.setDate(d.getDate() - wd); return ymd(d); };
+const JOURS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+const JOURS_L = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+const MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+const fmtDate = s => { const d = parse(s); return `${JOURS[d.getDay()]} ${d.getDate()} ${MOIS[d.getMonth()]}`; };
+const fmtDateL = s => { const d = parse(s); return `${JOURS_L[d.getDay()]} ${d.getDate()} ${MOIS[d.getMonth()]}`; };
+const range = (a, b) => { const out = []; for (let s = a; s <= b; s = addDays(s, 1)) out.push(s); return out; };
+
+/* ---------- formats ---------- */
+const fmtInt = n => Math.round(n).toLocaleString('fr-FR').replace(/ | /g, ' ');
+const fmtH = secs => { if (secs == null) return '—'; const m = Math.round(secs / 60); return `${Math.floor(m / 60)} h ${pad(m % 60)}`; };
+const fmtDur = ms => { const m = Math.floor(ms / 60000); return `${Math.floor(m / 60)} h ${pad(m % 60)}`; };
+const fmtClock = ms => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 3600)}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`; };
+const fmtDec = (n, d = 1) => n.toFixed(d).replace('.', ',');
+const sign = (n, d = 0) => (n > 0 ? '+' : n < 0 ? '−' : '±') + fmtDec(Math.abs(n), d);
+const clamp = (v, a = 0, b = 100) => Math.max(a, Math.min(b, v));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+
+/* ---------- état ---------- */
+function blank() {
+  return { settings: { apiKey: '', athlete: '0', tags: ['Cours', 'Projet', 'Perso'], lastTag: 'Cours', setup: false },
+           days: {}, work: { sessions: [], running: null }, garmin: { wellness: {}, activities: {}, lastSync: 0, error: '' } };
+}
+let REAL = load();
+let DEMO = null;           // état démo en mémoire, jamais sauvegardé
+let S = REAL;
+let view = 'today', weekSel = null, syncing = false, tickT = null;
+
+function load() {
+  try { const raw = localStorage.getItem(STORE); if (raw) { const s = JSON.parse(raw); const b = blank();
+    return { ...b, ...s, settings: { ...b.settings, ...s.settings }, work: { ...b.work, ...s.work }, garmin: { ...b.garmin, ...s.garmin } }; } } catch (e) {}
+  return blank();
+}
+function save() { if (S === DEMO) return; try { localStorage.setItem(STORE, JSON.stringify(REAL)); } catch (e) { toast('Sauvegarde impossible sur cet appareil'); } }
+const isDemo = () => S === DEMO;
+
+/* « maintenant » — en démo on se place au 40e jour pour voir l'arc rempli */
+function now() { const n = new Date(); return isDemo() ? new Date(2026, 10, 9, n.getHours(), n.getMinutes(), n.getSeconds()) : n; }
+const today = () => ymd(now());
+const arcDay = (s = today()) => diffDays(ARC_START, s) + 1;
+const inArc = s => s >= ARC_START && s <= ARC_END;
+const lastDay = () => { const t = today(); return t > ARC_END ? ARC_END : t; };
+
+/* ---------- habitudes ---------- */
+const getDay = s => S.days[s] || {};
+const dayObj = s => (S.days[s] = S.days[s] || {});
+const W = s => S.garmin.wellness[s] || null;
+const ACTS = s => S.garmin.activities[s] || [];
+
+function habit(s, id) {
+  const d = getDay(s), ov = (d.ov || {})[id];
+  if (id === 'sport') {
+    const a = ACTS(s); const best = a.reduce((m, x) => Math.max(m, x.min), 0);
+    const ok = best >= SPORT_MIN;
+    const txt = a.length ? a.map(x => `${x.label} ${x.min} min`).join(' · ') : 'Séance ou récup active ≥ 20 min';
+    return { done: ok || !!ov, src: ok ? 'garmin' : ov ? 'manuel' : '', txt, pct: Math.min(1, best / SPORT_MIN) };
+  }
+  if (id === 'steps') {
+    const w = W(s); const v = w && w.steps != null ? w.steps : null; const ok = v != null && v >= STEPS_MIN;
+    return { done: ok || !!ov, src: ok ? 'garmin' : ov ? 'manuel' : '', txt: v != null ? `${fmtInt(v)} / 10 000` : 'En attente des données Garmin', pct: v ? Math.min(1, v / STEPS_MIN) : 0 };
+  }
+  if (id === 'sleep') {
+    const w = W(s); const v = w && w.sleepSecs ? w.sleepSecs : null; const ok = v != null && v >= SLEEP_MIN;
+    const txt = v != null ? `${fmtH(v)}${w.sleepScore ? ' · score ' + w.sleepScore : ''}` : 'En attente des données Garmin';
+    return { done: ok || !!ov, src: ok ? 'garmin' : ov ? 'manuel' : '', txt, pct: v ? Math.min(1, v / SLEEP_MIN) : 0 };
+  }
+  if (id === 'water') { const v = d.water || 0; return { done: v >= WATER_MIN, txt: `${fmtDec(v / 1000)} / 1,5 L`, pct: Math.min(1, v / WATER_MIN), v }; }
+  return { done: !!d[id] };
+}
+const dayCount = s => HABITS.reduce((n, h) => n + (habit(s, h.id).done ? 1 : 0), 0);
+const colorOf = n => n >= 7 ? 'g' : n >= 5 ? 'o' : 'r';
+const COLV = { g: 'var(--good)', o: 'var(--warn)', r: 'var(--bad)' };
+const COLN = { g: 'Vert', o: 'Orange', r: 'Rouge' };
+
+/* jours « clos » = jours de l'arc avant aujourd'hui */
+function closedDays(upto = today()) { const end = addDays(upto, -1) < ARC_END ? addDays(upto, -1) : ARC_END; return end < ARC_START ? [] : range(ARC_START, end); }
+function regularity(days) { if (!days.length) return null; let n = 0; days.forEach(s => n += dayCount(s)); return n / (days.length * HABITS.length); }
+function reg28(upto = today()) { const c = closedDays(upto); return regularity(c.slice(-28)); }
+
+/* règle « jamais deux jours manqués de suite » */
+function missed(s) { return HABITS.filter(h => !habit(s, h.id).done).map(h => h.id); }
+function twoInARow(id, days) { let n = 0, prev = false; days.forEach(s => { const m = !habit(s, id).done; if (m && prev) n++; prev = m; }); return n; }
+
+/* éditable : aujourd'hui, ou hier jusqu'à 10 h */
+function editable(s) { const t = today(); if (s === t) return true; return s === addDays(t, -1) && now().getHours() < 10; }
+
+/* ---------- score de forme ---------- */
+function baseline(s) {
+  const hrv = [], rhr = [];
+  for (let i = 1; i <= 28; i++) { const w = W(addDays(s, -i)); if (!w) continue; if (w.hrv) hrv.push(w.hrv); if (w.restingHR) rhr.push(w.restingHR); }
+  return { hrv: hrv.length >= 5 ? avg(hrv) : null, rhr: rhr.length >= 5 ? avg(rhr) : null, n: Math.max(hrv.length, rhr.length) };
+}
+function form(s) {
+  const w = W(s); if (!w) return null;
+  const b = baseline(s), parts = [];
+  if (w.sleepScore != null) parts.push({ k: 'Sommeil', w: 35, s: clamp(w.sleepScore), t: `${fmtH(w.sleepSecs)} · score ${w.sleepScore}` });
+  else if (w.sleepSecs) parts.push({ k: 'Sommeil', w: 35, s: clamp(w.sleepSecs / 28800 * 100), t: fmtH(w.sleepSecs) });
+  if (w.hrv && b.hrv) { const r = w.hrv / b.hrv; parts.push({ k: 'VFC', w: 30, s: clamp(50 + (r - 1) * 250), t: `${Math.round(w.hrv)} ms (${sign((r - 1) * 100)} % vs moy. 28 j)` }); }
+  else if (w.hrv) parts.push({ k: 'VFC', w: 0, s: 50, t: `${Math.round(w.hrv)} ms (moyenne en construction)` });
+  if (w.restingHR && b.rhr) { const d = w.restingHR - b.rhr; parts.push({ k: 'FC repos', w: 20, s: clamp(50 - d * 10), t: `${w.restingHR} bpm (${sign(d, 1)} vs moy.)` }); }
+  else if (w.restingHR) parts.push({ k: 'FC repos', w: 0, s: 50, t: `${w.restingHR} bpm` });
+  if (w.bb != null) parts.push({ k: 'Body Battery', w: 15, s: clamp(w.bb), t: `${w.bb}` });
+  else if (w.readiness != null) parts.push({ k: 'Readiness', w: 15, s: clamp(w.readiness), t: `${w.readiness}` });
+  const tw = parts.reduce((a, p) => a + p.w, 0); if (!tw) return null;
+  const score = Math.round(parts.reduce((a, p) => a + p.s * p.w, 0) / tw);
+  const acwr = w.atl && w.ctl ? w.atl / w.ctl : null;
+  return { score, parts, acwr };
+}
+const zoneOf = sc => sc >= 70 ? { c: 'good', n: 'Feu vert', r: 'Séance prévue OK : tu peux pousser.' }
+  : sc >= 40 ? { c: 'warn', n: 'Modéré', r: 'Fais la séance prévue sans chercher de record (RPE ≤ 7, pas de max).' }
+  : { c: 'bad', n: 'Récupération', r: 'Remplace par une récup active : 20–40 min de marche, mobilité ou vélo très facile. Ça valide l’habitude Sport.' };
+
+/* =========================================================
+   SYNCHRO INTERVALS.ICU (Garmin → Intervals.icu → app)
+   ========================================================= */
+async function sync(force) {
+  if (isDemo() || syncing || !S.settings.apiKey) return;
+  if (!force && Date.now() - S.garmin.lastSync < 5 * 60e3) return;
+  syncing = true; renderTop();
+  try {
+    const t = today(), id = encodeURIComponent(S.settings.athlete || '0');
+    const head = { Authorization: 'Basic ' + btoa('API_KEY:' + S.settings.apiKey.trim()), Accept: 'application/json' };
+    const base = `https://intervals.icu/api/v1/athlete/${id}`;
+    const oldestW = addDays(ARC_START, -35);
+    const [wr, ar] = await Promise.all([
+      fetch(`${base}/wellness?oldest=${oldestW}&newest=${t}`, { headers: head }),
+      fetch(`${base}/activities?oldest=${addDays(ARC_START, -1)}&newest=${addDays(t, 1)}`, { headers: head }),
+    ]);
+    if (wr.status === 401 || wr.status === 403) throw new Error('Clé API refusée');
+    if (!wr.ok || !ar.ok) throw new Error(`Intervals.icu indisponible (${wr.status}/${ar.status})`);
+    const wl = await wr.json(), al = await ar.json();
+    const wellness = {};
+    (wl || []).forEach(x => {
+      const n = v => (v == null || v === '' ? null : Number(v));
+      wellness[x.id] = { steps: n(x.steps), sleepSecs: n(x.sleepSecs), sleepScore: n(x.sleepScore), hrv: n(x.hrv), restingHR: n(x.restingHR),
+        bb: n(x.bodyBattery ?? x.body_battery), readiness: n(x.readiness), atl: n(x.atl), ctl: n(x.ctl) };
+    });
+    const acts = {};
+    (al || []).forEach(a => {
+      const d = (a.start_date_local || '').slice(0, 10); if (!d) return;
+      const secs = a.moving_time || a.elapsed_time || 0;
+      (acts[d] = acts[d] || []).push({ label: ACT_FR[a.type] || a.type || 'Activité', name: a.name || '', min: Math.round(secs / 60),
+        load: a.icu_training_load || 0, rpe: a.icu_rpe || a.perceived_exertion || null });
+    });
+    REAL.garmin = { wellness, activities: acts, lastSync: Date.now(), error: '' };
+    save();
+  } catch (e) {
+    REAL.garmin.error = e.message === 'Failed to fetch' ? 'Pas de réseau' : e.message; save();
+  } finally { syncing = false; render(); }
+}
+
+/* =========================================================
+   CHRONO DE TRAVAIL
+   ========================================================= */
+const elapsed = r => r ? r.acc + (r.seg ? Date.now() - r.seg : 0) : 0;
+function chronoStart() {
+  const r = S.work.running;
+  if (!r) S.work.running = { tag: S.settings.lastTag || S.settings.tags[0] || '', started: Date.now(), date: today(), seg: Date.now(), acc: 0, ask: 3 * 3600e3 };
+  else if (!r.seg) r.seg = Date.now();
+  save(); render();
+}
+function chronoPause() { const r = S.work.running; if (r && r.seg) { r.acc += Date.now() - r.seg; r.seg = null; save(); render(); } }
+function chronoStop(cutMs) {
+  const r = S.work.running; if (!r) return;
+  let ms = elapsed(r); if (cutMs != null) ms = cutMs;
+  S.work.running = null;
+  if (ms >= 60e3) { S.work.sessions.push({ id: Date.now().toString(36), date: r.date, start: r.started, ms, tag: r.tag }); toast(`Session enregistrée : ${fmtDur(ms)}`); }
+  else toast('Session de moins d’1 min ignorée');
+  save(); render();
+}
+function workMs(s) { let ms = 0; S.work.sessions.forEach(x => { if (x.date === s) ms += x.ms; }); const r = S.work.running; if (r && r.date === s) ms += elapsed(r); return ms; }
+function workTotal() { let ms = S.work.sessions.reduce((a, x) => a + (x.date >= ARC_START && x.date <= ARC_END ? x.ms : 0), 0); const r = S.work.running; if (r) ms += elapsed(r); return ms; }
+function checkLongRun() {
+  const r = S.work.running; if (!r || !r.seg) return;
+  if (elapsed(r) > r.ask && !document.getElementById('ov').classList.contains('on')) {
+    openSheet(`<h2>Toujours au travail ?</h2><p class="muted">Ton chrono tourne depuis <b class="num" style="font-size:20px;color:var(--tx)">${fmtDur(elapsed(r))}</b>. Si tu as oublié de l’arrêter, corrige la durée pour garder des données justes.</p>
+      <div class="field"><label class="lbl">Durée réelle (minutes)</label><input id="cutMin" type="number" inputmode="numeric" value="${Math.round(elapsed(r) / 60000)}"></div>
+      <div class="btns" style="flex-direction:column"><button class="btn pri" data-a="keepRun">Oui, je continue</button><button class="btn" data-a="cutRun">Arrêter avec cette durée</button></div>`);
+  }
+}
+
+/* =========================================================
+   RENDU
+   ========================================================= */
+const $app = document.getElementById('app');
+function render() {
+  if (!REAL.settings.setup && !isDemo()) { renderOnboarding(); return; }
+  document.getElementById('tabs').hidden = false;
+  document.querySelectorAll('nav.tabs button').forEach(b => { b.classList.toggle('on', b.dataset.t === view); b.classList.toggle('run', b.dataset.t === 'work' && !!(S.work.running && S.work.running.seg)); });
+  const body = view === 'today' ? vToday() : view === 'arc' ? vArc() : view === 'week' ? vWeek() : vWork();
+  $app.innerHTML = (isDemo() ? `<div class="demo-band">MODE DÉMO · données fictives au jour 40 · <u data-a="exitDemo">quitter</u></div>` : '') + `<header class="top" id="top"></header>` + body;
+  renderTop(); bindCharts(); setTick();
+}
+function renderTop() {
+  const el = document.getElementById('top'); if (!el) return;
+  const t = today(), d = arcDay(t);
+  let title;
+  if (t < ARC_START) title = `J−${diffDays(t, ARC_START)}<small> avant l’arc</small>`;
+  else if (t > ARC_END) title = `Arc terminé`;
+  else title = `Jour ${d}<small> / 92</small>`;
+  const g = S.garmin; let st, cls;
+  if (isDemo()) { st = 'Démo'; cls = 'ok'; }
+  else if (!S.settings.apiKey) { st = 'Garmin non relié'; cls = 'err'; }
+  else if (syncing) { st = 'Synchro…'; cls = 'busy'; }
+  else if (g.error) { st = g.error; cls = 'err'; }
+  else if (g.lastSync) { const m = Math.round((Date.now() - g.lastSync) / 60000); st = m < 1 ? 'À jour' : m < 60 ? `il y a ${m} min` : `il y a ${Math.round(m / 60)} h`; cls = 'ok'; }
+  else { st = 'Jamais synchronisé'; cls = ''; }
+  el.innerHTML = `<div class="brand"><span class="t">WINTER ARC</span><span class="d">${title}</span></div>
+    <div class="topR"><button class="sync" data-a="sync"><span class="dot ${cls}"></span>${esc(st)}</button>
+    <button class="iconbtn" data-a="settings" aria-label="Réglages"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button></div>`;
+}
+
+/* ---------- Onboarding ---------- */
+function renderOnboarding() {
+  document.getElementById('tabs').hidden = true;
+  $app.innerHTML = `<div class="hero"><img src="icons/icon-192.png" alt=""><h1>Winter<br><span>Arc</span></h1>
+    <p class="muted">1er octobre → 31 décembre 2026 · 92 jours · 8 habitudes</p></div>
+    <div class="card"><h3><span class="lbl">Relier Garmin</span></h3>
+      <p class="muted" style="margin-top:0">Tes données Garmin arrivent via <b>Intervals.icu</b> (déjà relié à ta montre). Colle ta clé API : intervals.icu → Settings → <i>Developer Settings</i> → API key.</p>
+      <div class="field"><label class="lbl" for="k">Clé API Intervals.icu</label><input id="k" type="password" autocomplete="off" placeholder="ex. 5f3k…"></div>
+      <div class="field"><label class="lbl" for="ath">ID athlète</label><input id="ath" value="0" autocomplete="off"><div class="help">Laisse <b>0</b> : c’est « le compte de cette clé ». Sinon ton ID du type i123456.</div></div>
+      <button class="btn pri" data-a="connect">Connecter et démarrer</button>
+      <div id="cerr" class="help" style="color:var(--bad)"></div>
+    </div>
+    <button class="btn" data-a="demo" style="width:100%">Voir la démo (jour 40)</button>
+    <p class="help" style="text-align:center;margin-top:14px">Tout reste sur ce téléphone : aucune donnée n’est envoyée ailleurs qu’à Intervals.icu.</p>`;
+}
+
+/* ---------- AUJOURD'HUI ---------- */
+function vToday() {
+  const t = today(); let h = '';
+  if (t < ARC_START) h += `<div class="alert info"><span class="ic">❄</span><div>L’arc commence le <b>${fmtDateL(ARC_START)}</b>. Tu peux déjà tester les cases et le chrono.</div></div>`;
+  if (t > ARC_END) h += `<div class="alert info"><span class="ic">✓</span><div><b>Arc terminé.</b> Retrouve ton bilan complet dans l’onglet Arc.</div></div>`;
+
+  // Score de forme
+  const f = form(t);
+  if (f) {
+    const z = zoneOf(f.score), C = 2 * Math.PI * 50;
+    const lows = [1, 2, 3].map(i => form(addDays(t, -i))).filter(Boolean);
+    const persist = f.score < 40 && lows.length >= 2 && lows.slice(0, 2).every(x => x.score < 40);
+    h += `<div class="card"><div class="between" style="margin-bottom:10px"><span class="lbl">Score de forme</span><span class="lbl">Garmin · ${fmtDate(t)}</span></div>
+      <div class="form"><div class="ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" fill="none" stroke="var(--s3)" stroke-width="11"/>
+        <circle cx="60" cy="60" r="50" fill="none" stroke="var(--${z.c})" stroke-width="11" stroke-linecap="round" stroke-dasharray="${C * f.score / 100} ${C}"/></svg>
+        <div class="c"><span class="v">${f.score}</span><span class="u">/ 100</span></div></div>
+      <div style="min-width:0"><span class="zone" style="color:var(--${z.c})">● ${z.n}</span><div class="muted" style="font-size:14px;margin-top:6px">${z.r}</div></div></div>
+      <div class="parts">${f.parts.map(p => `<div class="part"><span class="k">${p.k}</span><span>${p.t}</span></div>`).join('')}</div>
+      ${persist ? `<div class="reco bad">3 jours de suite sous 40 : allège 2–3 jours (sommeil, récup active). Si douleur ou symptôme inhabituel, consulte un professionnel de santé.</div>` : ''}
+      ${f.acwr && f.acwr > 1.5 ? `<div class="reco warn">Charge aiguë élevée (ATL/CTL ${fmtDec(f.acwr)}) : la fatigue monte plus vite que ta forme. Garde une séance facile aujourd’hui.</div>` : ''}
+    </div>`;
+  } else {
+    h += `<div class="card"><span class="lbl">Score de forme</span><p class="muted" style="margin:8px 0 0">${S.settings.apiKey || isDemo() ? 'En attente de ta nuit Garmin (sommeil, VFC, FC repos). Synchronise ta montre avec Garmin Connect, puis touche le bouton de synchro en haut.' : 'Relie Intervals.icu dans les réglages pour activer le score.'}</p></div>`;
+  }
+
+  // Règle des 2 jours
+  const y = addDays(t, -1);
+  if (inArc(y) && inArc(t)) {
+    const miss = missed(y).filter(id => !habit(t, id).done);
+    const broken = inArc(addDays(y, -1)) ? missed(y).filter(id => !habit(addDays(y, -1), id).done) : [];
+    if (broken.length) h += `<div class="alert bad"><span class="ic">!!</span><div><b>2 jours de suite</b> sur ${broken.map(i => HN[i]).join(', ')}. Pas grave : on ne laisse pas filer un 3e jour.</div></div>`;
+    else if (miss.length) h += `<div class="alert warn"><span class="ic">!</span><div>Hier tu as manqué <b>${miss.map(i => HN[i]).join(', ')}</b>. Règle : jamais deux jours de suite. Priorité aujourd’hui.</div></div>`;
+  }
+  // Rattrapage d'hier
+  if (inArc(y) && editable(y) && y !== t) {
+    const ym = HABITS.filter(x => !x.auto && !habit(y, x.id).done);
+    if (ym.length) h += `<div class="card" style="border-color:rgba(127,216,255,.3)"><div class="between" style="margin-bottom:10px"><span class="lbl">Hier · cochable jusqu’à 10 h</span><span class="lbl">${fmtDate(y)}</span></div>
+      <div class="habits">${ym.map(x => habitRow(y, x, [])).join('')}</div></div>`;
+  }
+  // Habitudes
+  if (inArc(t) || t < ARC_START) {
+    const n = dayCount(t), c = colorOf(n);
+    const prio = inArc(y) ? missed(y) : [];
+    h += `<div class="dayhead"><span class="lbl">${fmtDateL(t)}</span><span class="pill"><span class="sw" style="background:${n >= 7 ? COLV.g : 'var(--ice)'}"></span>${n}/8${n >= 7 ? ' · vert' : n >= 5 ? ' · encore ' + (7 - n) + ' pour le vert' : ''}</span></div>
+      <div class="habits">${HABITS.map(x => habitRow(t, x, prio)).join('')}</div>`;
+  }
+  // Chrono
+  h += `<div class="sec"></div>` + chronoCard();
+  if (now().getDay() === 0 && inArc(t)) h += `<button class="alert info" style="width:100%;text-align:left" data-a="tab" data-t="week"><span class="ic">▤</span><div><b>Ton bilan de la semaine est prêt.</b> Touche pour l’ouvrir.</div></button>`;
+  return h;
+}
+
+function habitRow(s, x, prio) {
+  const st = habit(s, x.id);
+  const isP = prio.includes(x.id) && !st.done;
+  const ck = `<span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>`;
+  const tagP = isP ? `<span class="tag p">PRIORITÉ</span>` : '';
+  if (x.counter) {
+    return `<div class="h ${st.done ? 'done' : ''} ${isP ? 'prio' : ''}">${ck}<div class="m"><div class="n">${x.n}</div><div class="sub num" style="font-size:15px">${st.txt}</div></div>${tagP}
+      <div class="water"><button class="wbtn" data-a="water" data-d="${s}" data-v="-500" aria-label="Retirer 500 ml">−</button><button class="wbtn plus" data-a="water" data-d="${s}" data-v="500">+500</button></div>
+      <i class="prog" style="width:${st.pct * 100}%"></i></div>`;
+  }
+  if (x.auto) {
+    const badge = st.src === 'manuel' ? `<span class="tag">MANUEL</span>` : `<span class="tag g">GARMIN</span>`;
+    return `<button class="h ${st.done ? 'done' : ''} ${isP ? 'prio' : ''}" data-a="auto" data-d="${s}" data-h="${x.id}">${ck}<div class="m"><div class="n">${x.n}</div><div class="sub">${esc(st.txt)}</div></div>${tagP}${badge}
+      ${st.done ? '' : `<i class="prog" style="width:${st.pct * 100}%"></i>`}</button>`;
+  }
+  return `<button class="h ${st.done ? 'done' : ''} ${isP ? 'prio' : ''}" data-a="check" data-d="${s}" data-h="${x.id}">${ck}<div class="m"><div class="n">${x.n}</div></div>${tagP}</button>`;
+}
+
+function chronoCard() {
+  const r = S.work.running, ms = elapsed(r), run = !!(r && r.seg);
+  const tags = S.settings.tags;
+  const cur = r ? r.tag : (S.settings.lastTag || tags[0]);
+  const todayMs = workMs(today()), totalMs = workTotal();
+  return `<div class="card chrono"><div class="between"><span class="lbl">Chrono de travail</span><span class="lbl">Aujourd’hui ${fmtDur(todayMs)}</span></div>
+    <div class="between" style="margin-top:10px;align-items:flex-end"><span class="time ${run ? 'run' : ''}" id="clock">${fmtClock(ms)}</span>
+      <span style="text-align:right;white-space:nowrap"><span class="lbl">Total arc</span><br><span class="num" style="font-size:22px" id="tot">${fmtDur(totalMs)}</span></span></div>
+    <div class="chips">${tags.map(t => `<button class="chip ${t === cur ? 'on' : ''}" data-a="tag" data-v="${esc(t)}">${esc(t)}</button>`).join('')}</div>
+    <div class="btns">${!r ? `<button class="btn pri" data-a="cStart">▶ Démarrer</button>`
+      : run ? `<button class="btn" data-a="cPause">❚❚ Pause</button><button class="btn dng" data-a="cStop">■ Stop</button>`
+      : `<button class="btn pri" data-a="cStart">▶ Reprendre</button><button class="btn dng" data-a="cStop">■ Stop</button>`}</div>
+    ${r && !run ? `<div class="help">En pause · le temps est conservé.</div>` : ''}</div>`;
+}
+
+/* ---------- ARC ---------- */
+function calGrid(cellFn) {
+  const w0 = weekStart(ARC_START), w1 = weekStart(ARC_END);
+  let h = `<div class="cal"><span></span>${['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(x => `<span class="hd">${x}</span>`).join('')}`;
+  for (let w = w0; w <= w1; w = addDays(w, 7)) {
+    const days = range(w, addDays(w, 6));
+    const first = days.find(s => s.endsWith('-01') && inArc(s)) || (w === w0 ? ARC_START : null);
+    h += `<span class="ml">${first ? MOIS[parse(first).getMonth()].replace('.', '').toUpperCase() : ''}</span>`;
+    days.forEach(s => h += inArc(s) ? cellFn(s) : `<span class="cell out"></span>`);
+  }
+  return h + `</div>`;
+}
+function vArc() {
+  const t = today(), last = lastDay(), dn = clamp(arcDay(t), 0, 92);
+  const closed = closedDays(t);
+  const r28 = reg28(t), rAll = regularity(closed);
+  const cnt = { g: 0, o: 0, r: 0 }; closed.forEach(s => cnt[colorOf(dayCount(s))]++);
+  let h = `<div class="card"><div class="between"><span class="lbl">Progression de l’arc</span><span class="lbl">${92 - dn > 0 ? `${92 - dn} j restants` : 'Terminé'}</span></div>
+    <div class="num" style="font-size:46px;line-height:1;margin:8px 0 10px">${Math.max(dn, 0)}<span style="font-size:22px;color:var(--mute)"> / 92 jours</span></div>
+    <div class="bar"><i style="width:${Math.max(dn, 0) / 92 * 100}%"></i></div>
+    <div class="grid3" style="margin-top:14px">
+      <div class="stat"><div class="v">${r28 == null ? '—' : Math.round(r28 * 100) + '<small>%</small>'}</div><div class="s">Régul. 28 j<br>obj. ≥ 80 %</div></div>
+      <div class="stat"><div class="v">${rAll == null ? '—' : Math.round(rAll * 100) + '<small>%</small>'}</div><div class="s">Régul.<br>totale</div></div>
+      <div class="stat"><div class="v" style="font-size:24px;white-space:nowrap"><span style="color:var(--good)">${cnt.g}</span> · <span style="color:var(--warn)">${cnt.o}</span> · <span style="color:var(--bad)">${cnt.r}</span></div><div class="s">Jours vert ·<br>orange · rouge</div></div>
+    </div></div>`;
+
+  h += `<div class="card"><h3><span class="lbl">Les 92 jours</span><span class="lbl">touche un jour</span></h3>` + calGrid(s => {
+    if (s > t) return `<span class="cell fut"><span class="dn">${parse(s).getDate()}</span></span>`;
+    const n = dayCount(s);
+    if (s === t) return `<button class="cell live today" data-a="day" data-d="${s}"><span class="dn">${parse(s).getDate()}</span>${n}</button>`;
+    return `<button class="cell ${colorOf(n)}" data-a="day" data-d="${s}" aria-label="${fmtDate(s)} : ${n} sur 8"><span class="dn">${parse(s).getDate()}</span>${n}</button>`;
+  }) + `<div class="legend"><span><i style="background:var(--good)"></i>7–8 vert</span><span><i style="background:var(--warn)"></i>5–6 orange</span><span><i style="background:var(--bad)"></i>≤ 4 rouge</span><span><i style="background:var(--s3);outline:1.5px solid var(--ice)"></i>aujourd’hui</span></div></div>`;
+
+  // Courbe
+  const pts = range(ARC_START, last).map(s => ({ s, p: dayCount(s) / 8 }));
+  pts.forEach((x, i) => { const w = pts.slice(Math.max(0, i - 6), i + 1); x.m = avg(w.map(y => y.p)); });
+  h += `<div class="card"><h3><span class="lbl">La courbe de l’arc</span></h3>${arcChart(pts)}
+    <div class="legend"><span><i style="background:var(--ice2);height:10px"></i>Jour (% habitudes)</span><span><i style="background:var(--tx);height:2px;width:14px"></i>Moyenne 7 j</span><span><i style="border-top:2px dashed var(--good);height:0;width:14px;border-radius:0"></i>Objectif 80 %</span></div></div>`;
+
+  // par habitude
+  const cd = closed.length ? closed : (inArc(t) ? [t] : []);
+  h += `<div class="card"><h3><span class="lbl">Par habitude</span><span class="lbl">% · 2 j ratés</span></h3><div class="hbars">${HABITS.map(x => {
+    const d = cd.filter(s => habit(s, x.id).done).length, p = cd.length ? d / cd.length : 0, b = twoInARow(x.id, cd);
+    return `<div class="hb"><span>${x.n}</span><span class="tr"><i style="width:${p * 100}%;background:${p >= .8 ? 'var(--ice)' : p >= .6 ? 'var(--warn)' : 'var(--bad)'}"></i></span><span class="p">${Math.round(p * 100)}%${b ? ` <span style="color:var(--bad);font-size:12px">${b}×</span>` : ''}</span></div>`;
+  }).join('')}</div><p class="help">« 2× » = nombre de fois où l’habitude a été ratée deux jours de suite.</p></div>`;
+  return h;
+}
+
+function arcChart(pts) {
+  const Wd = 360, H = 150, L = 26, B = 18, T = 8, iw = Wd - L - 4, ih = H - B - T, n = 92, sw = iw / n;
+  const y = v => T + ih * (1 - v);
+  let g = '';
+  [0, .5, .8, 1].forEach(v => { g += `<line x1="${L}" x2="${Wd - 4}" y1="${y(v)}" y2="${y(v)}" stroke="${v === .8 ? 'var(--good)' : 'var(--line)'}" stroke-width="1" ${v === .8 ? 'stroke-dasharray="4 4"' : ''}/>
+    <text x="${L - 5}" y="${y(v) + 3.5}" fill="var(--mute)" font-size="9" text-anchor="end">${v * 100}</text>`; });
+  ['oct.', 'nov.', 'déc.'].forEach((m, i) => { const s = ['2026-10-01', '2026-11-01', '2026-12-01'][i]; const x = L + diffDays(ARC_START, s) * sw; g += `<text x="${x + 1}" y="${H - 4}" fill="var(--mute)" font-size="9">${m}</text>`; });
+  pts.forEach((p, i) => { const bh = Math.max(1.5, ih * p.p); g += `<rect x="${L + i * sw + .5}" y="${T + ih - bh}" width="${Math.max(1, sw - 1.2)}" height="${bh}" rx="1" fill="var(--ice2)" opacity=".55"/>`; });
+  if (pts.length > 1) g += `<path d="${pts.map((p, i) => `${i ? 'L' : 'M'}${(L + i * sw + sw / 2).toFixed(1)},${y(p.m).toFixed(1)}`).join('')}" fill="none" stroke="var(--tx)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  window.__arcPts = pts;
+  return `<div class="chart" data-chart="arc"><svg viewBox="0 0 ${Wd} ${H}">${g}<line class="xh" y1="${T}" y2="${T + ih}" stroke="var(--tx2)" stroke-width="1" opacity="0"/><rect class="hit" x="${L}" y="0" width="${iw}" height="${H}" fill="transparent"/></svg><div class="tip"></div></div>`;
+}
+function bindCharts() {
+  document.querySelectorAll('[data-chart="arc"]').forEach(c => {
+    const svg = c.querySelector('svg'), tip = c.querySelector('.tip'), xh = c.querySelector('.xh'), pts = window.__arcPts || [];
+    const mv = e => {
+      const rect = svg.getBoundingClientRect(), sc = 360 / rect.width, px = (e.clientX - rect.left) * sc;
+      const i = Math.floor((px - 26) / ((360 - 30) / 92)); const p = pts[i];
+      if (!p) { tip.style.display = 'none'; xh.setAttribute('opacity', 0); return; }
+      const cx = 26 + (i + .5) * (330 / 92);
+      xh.setAttribute('x1', cx); xh.setAttribute('x2', cx); xh.setAttribute('opacity', .6);
+      tip.style.display = 'block'; tip.style.left = clamp(cx / sc, 60, rect.width - 60) + 'px'; tip.style.top = '6px';
+      tip.innerHTML = `<b>${fmtDate(p.s)}</b> · J${arcDay(p.s)}<br>${Math.round(p.p * 8)}/8 habitudes · moy. 7 j ${Math.round(p.m * 100)} %`;
+    };
+    svg.addEventListener('pointermove', mv); svg.addEventListener('pointerdown', mv);
+    svg.addEventListener('pointerleave', () => { tip.style.display = 'none'; xh.setAttribute('opacity', 0); });
+  });
+}
+
+/* ---------- BILAN HEBDO ---------- */
+function weeks() { const out = []; for (let w = weekStart(ARC_START); w <= weekStart(lastDay()); w = addDays(w, 7)) out.push(w); return out; }
+function weekStats(w) {
+  const t = today();
+  const days = range(w, addDays(w, 6)).filter(s => inArc(s) && s <= t);
+  const closed = days.filter(s => s < t);
+  const use = closed.length ? closed : days;
+  const sport = [], sleep = [], steps = [], hrv = [], rhr = [], forms = [];
+  let load = 0, sportMin = 0;
+  days.forEach(s => {
+    ACTS(s).forEach(a => { load += a.load || 0; sportMin += a.min; if (a.min >= SPORT_MIN) sport.push(a); });
+    const x = W(s); if (x) { if (x.sleepSecs) sleep.push(x.sleepSecs); if (x.steps != null && s < t) steps.push(x.steps); if (x.hrv) hrv.push(x.hrv); if (x.restingHR) rhr.push(x.restingHR); }
+    const f = form(s); if (f) forms.push(f.score);
+  });
+  const work = {}; let workT = 0;
+  S.work.sessions.forEach(x => { if (days.includes(x.date)) { work[x.tag] = (work[x.tag] || 0) + x.ms; workT += x.ms; } });
+  return { days, use, reg: regularity(use), sport: sport.length, sportMin, load: Math.round(load), sleep: avg(sleep), steps: avg(steps), hrv: avg(hrv), rhr: avg(rhr), form: avg(forms), work, workT };
+}
+function vWeek() {
+  const ws = weeks(); if (!ws.length) return `<div class="card"><p class="muted">Le premier bilan apparaîtra pendant la première semaine de l’arc.</p></div>`;
+  if (!weekSel || !ws.includes(weekSel)) { const t0 = today(); weekSel = ws.filter(w => w < t0 && range(w, addDays(w, 6)).some(s => inArc(s) && s < t0)).pop() || ws[ws.length - 1]; }
+  const i = ws.indexOf(weekSel), w = weekSel, st = weekStats(w), prev = i > 0 ? weekStats(ws[i - 1]) : null;
+  const end = addDays(w, 6), t = today();
+  const r28 = reg28(end < t ? addDays(end, 1) : t);
+  const pct = (a, b) => b ? Math.round((a - b) / b * 100) : null;
+  const cmp = (a, b, unit = '%') => { if (end >= today()) return ''; const p = pct(a, b); return p == null ? '' : `<span style="color:${p >= 0 ? 'var(--tx2)' : 'var(--tx2)'}">${p >= 0 ? '▲' : '▼'} ${Math.abs(p)} ${unit} vs S-1</span>`; };
+  const ongoing = end >= t;
+  const noClosed = !range(w, end).some(x => inArc(x) && x < t);
+
+  let h = `<div class="between" style="margin-bottom:12px"><button class="iconbtn" data-a="wk" data-v="-1" ${i ? '' : 'disabled style="opacity:.3"'}>‹</button>
+    <div style="text-align:center"><div class="lbl">Semaine ${i + 1} / ${weeks().length}${ongoing ? ' · en cours' : ''}</div><div class="num" style="font-size:22px">${parse(w).getDate()} ${MOIS[parse(w).getMonth()]} – ${parse(end).getDate()} ${MOIS[parse(end).getMonth()]}</div></div>
+    <button class="iconbtn" data-a="wk" data-v="1" ${i < ws.length - 1 ? '' : 'disabled style="opacity:.3"'}>›</button></div>`;
+
+  // Synthèse auto
+  const per = HABITS.map(x => { const d = st.use.filter(s => habit(s, x.id).done).length; return { x, d, n: st.use.length, p: st.use.length ? d / st.use.length : 0 }; });
+  const best = [...per].sort((a, b) => b.p - a.p)[0], worst = [...per].sort((a, b) => a.p - b.p)[0];
+  const lines = [];
+  if (noClosed) lines.push(['…', 'var(--tx2)', 'Semaine qui démarre : le bilan se remplit jour après jour (les journées sont comptées une fois terminées).']);
+  else if (st.reg != null) lines.push(st.reg >= .8 ? ['✓', 'var(--good)', `Régularité ${Math.round(st.reg * 100)} % : objectif 80 % atteint.`] : ['✗', 'var(--bad)', `Régularité ${Math.round(st.reg * 100)} % : sous l’objectif de 80 % (il manque ${Math.ceil(.8 * st.use.length * 8 - st.reg * st.use.length * 8)} cases).`]);
+  if (!noClosed && best && best.p > 0) lines.push(['★', 'var(--ice)', `Point fort : <b>${best.x.n}</b> (${best.d}/${best.n}).`]);
+  if (!noClosed && worst && worst.p < 1) lines.push(['→', 'var(--warn)', `À prioriser : <b>${worst.x.n}</b> (${worst.d}/${worst.n}).`]);
+  const br = HABITS.filter(x => twoInARow(x.id, st.use) > 0);
+  if (br.length) lines.push(['!!', 'var(--bad)', `Règle des 2 jours cassée : ${br.map(x => x.n).join(', ')}.`]);
+  if (st.sleep != null && st.sleep < SLEEP_MIN) lines.push(['☾', 'var(--warn)', `Sommeil moyen ${fmtH(st.sleep)} : sous 7 h 30. Avance le coucher de 20–30 min.`]);
+  if (prev && prev.load && st.load > prev.load * 1.3 && !ongoing) lines.push(['▲', 'var(--warn)', `Charge d’entraînement +${pct(st.load, prev.load)} % vs S-1 : surveille la récup la semaine prochaine.`]);
+  if (st.form != null && st.form < 45) lines.push(['↓', 'var(--warn)', `Forme moyenne ${Math.round(st.form)}/100 : semaine plus légère conseillée.`]);
+  if (st.workT) lines.push(['◷', 'var(--ice)', `${fmtDur(st.workT)} de travail chronométrées${prev && prev.workT ? ` (${sign(pct(st.workT, prev.workT))} % vs S-1)` : ''}.`]);
+
+  h += `<div class="card"><h3><span class="lbl">Synthèse automatique</span></h3><div class="verdict">${lines.map(l => `<div class="vline"><span class="ic" style="color:${l[1]}">${l[0]}</span><span>${l[2]}</span></div>`).join('')}</div></div>`;
+
+  h += `<div class="grid2" style="margin-bottom:12px">
+    <div class="stat"><div class="v">${st.reg == null || noClosed ? '—' : Math.round(st.reg * 100) + '<small>%</small>'}</div><div class="s">Régularité 7 j</div></div>
+    <div class="stat"><div class="v">${r28 == null ? '—' : Math.round(r28 * 100) + '<small>%</small>'}</div><div class="s">Régularité 28 j</div></div>
+    <div class="stat"><div class="v">${st.load || '—'}</div><div class="s">Charge d’entraînement ${prev ? cmp(st.load, prev.load) : ''}</div></div>
+    <div class="stat"><div class="v">${st.sport}<small> séances</small></div><div class="s">${fmtDur(st.sportMin * 60000)} au total</div></div>
+    <div class="stat"><div class="v">${st.sleep ? fmtH(st.sleep).replace(' h ', 'h') : '—'}</div><div class="s">Sommeil moyen</div></div>
+    <div class="stat"><div class="v">${st.steps ? fmtInt(st.steps) : '—'}</div><div class="s">Pas / jour (moy.)</div></div>
+    <div class="stat"><div class="v">${st.form ? Math.round(st.form) : '—'}<small>/100</small></div><div class="s">Forme moyenne · VFC ${st.hrv ? Math.round(st.hrv) + ' ms' : '—'}</div></div>
+    <div class="stat"><div class="v">${st.workT ? fmtDur(st.workT).replace(' h ', 'h') : '0h00'}</div><div class="s">Travail ${prev && prev.workT ? cmp(st.workT, prev.workT) : ''}</div></div></div>`;
+
+  // grille habitudes
+  const days7 = range(w, end);
+  h += `<div class="card"><h3><span class="lbl">Habitudes</span></h3><div class="wk" style="margin-bottom:6px"><span></span>${['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(x => `<span class="wkhd">${x}</span>`).join('')}<span></span></div>
+    <div style="display:grid;gap:6px">${per.map(({ x, d, n }) => `<div class="wk"><span>${x.n}</span>${days7.map(s => {
+      if (!inArc(s)) return `<span></span>`; if (s > t) return `<span class="wd f"></span>`;
+      const ok = habit(s, x.id).done; return `<span class="wd ${ok ? 'y' : s === t ? '' : 'n'}" title="${fmtDate(s)}"></span>`;
+    }).join('')}<span class="p">${d}/${n}</span></div>`).join('')}</div>
+    <div class="legend"><span><i style="background:var(--ice)"></i>fait</span><span><i style="border:1.5px solid var(--bad)"></i>manqué</span><span><i style="background:var(--s3)"></i>aujourd’hui, en cours</span></div></div>`;
+
+  // travail par étiquette
+  const tags = Object.entries(st.work).sort((a, b) => b[1] - a[1]);
+  if (tags.length) { const mx = tags[0][1];
+    h += `<div class="card"><h3><span class="lbl">Travail par étiquette</span><span class="num" style="font-size:18px">${fmtDur(st.workT)}</span></h3><div class="hbars">${tags.map(([k, v]) => `<div class="hb"><span>${esc(k)}</span><span class="tr"><i style="width:${v / mx * 100}%"></i></span><span class="p">${fmtDur(v).replace(' h ', 'h')}</span></div>`).join('')}</div></div>`; }
+  return h;
+}
+
+/* ---------- TRAVAIL ---------- */
+function vWork() {
+  const tot = workTotal(), hrs = tot / 3600e3, next = MILESTONES.find(m => hrs < m), prevM = [...MILESTONES].reverse().find(m => hrs >= m) || 0;
+  let h = `<div class="card"><span class="lbl">Temps travaillé depuis le 1er octobre</span>
+    <div class="num" style="font-size:60px;line-height:1;margin:10px 0 6px;color:var(--ice)">${Math.floor(hrs)}<span style="font-size:30px"> h </span>${pad(Math.floor(tot / 60000) % 60)}</div>
+    ${next ? `<div class="between" style="font-size:13px;margin-bottom:6px"><span class="muted">Prochain palier : <b style="color:var(--tx)">${next} h</b></span><span class="muted">encore ${fmtDur(next * 3600e3 - tot)}</span></div><div class="bar"><i style="width:${(hrs - prevM) / (next - prevM) * 100}%"></i></div>` : `<div class="muted">Tous les paliers débloqués. Respect.</div>`}
+    <div class="mile">${MILESTONES.map(m => `<div class="${hrs >= m ? 'on' : ''}">${hrs >= m ? '✓ ' : ''}${m} h</div>`).join('')}</div></div>`;
+  h += chronoCard();
+
+  // semaine en barres
+  const w = weekStart(today()), d7 = range(w, addDays(w, 6)), vals = d7.map(s => workMs(s) / 3600e3), mx = Math.max(1, ...vals);
+  const Wd = 340, H = 130, bw = 30, gap = (Wd - 7 * bw) / 6;
+  let g = '';
+  vals.forEach((v, i) => { const bh = v ? Math.max(4, (H - 34) * v / mx) : 0, x = i * (bw + gap), yy = H - 18 - bh;
+    g += (bh ? `<path d="M${x},${H - 18}V${yy + 4}a4,4 0 0 1 4,-4h${bw - 8}a4,4 0 0 1 4,4V${H - 18}Z" fill="${d7[i] === today() ? 'var(--ice)' : 'var(--ice2)'}"/>` : `<rect x="${x}" y="${H - 19.5}" width="${bw}" height="1.5" fill="var(--line)"/>`)
+      + (v ? `<text x="${x + bw / 2}" y="${yy - 5}" text-anchor="middle" fill="var(--tx2)" font-size="11" font-family="Barlow Condensed" font-weight="700">${fmtDec(v)}</text>` : '')
+      + `<text x="${x + bw / 2}" y="${H - 3}" text-anchor="middle" fill="${d7[i] === today() ? 'var(--ice)' : 'var(--mute)'}" font-size="10" font-weight="700">${['L', 'M', 'M', 'J', 'V', 'S', 'D'][i]}</text>`; });
+  h += `<div class="card"><h3><span class="lbl">Cette semaine (heures)</span><span class="num" style="font-size:18px">${fmtDec(vals.reduce((a, b) => a + b, 0))} h</span></h3><div class="chart"><svg viewBox="0 0 ${Wd} ${H}">${g}</svg></div></div>`;
+
+  // carte de chaleur
+  const lv = ms => { const x = ms / 3600e3; return x <= 0 ? 0 : x < 1 ? 1 : x < 2 ? 2 : x < 4 ? 3 : 4; };
+  const HC = ['var(--s2)', 'rgba(127,216,255,.22)', 'rgba(127,216,255,.45)', 'rgba(127,216,255,.7)', 'var(--ice)'];
+  h += `<div class="card"><h3><span class="lbl">Carte de chaleur · 92 jours</span></h3>` + calGrid(s => {
+    if (s > today()) return `<span class="cell fut"><span class="dn">${parse(s).getDate()}</span></span>`;
+    const ms = workMs(s), l = lv(ms);
+    return `<span class="cell ${s === today() ? 'today' : ''}" style="background:${HC[l]}" title="${fmtDate(s)} : ${fmtDur(ms)}"><span class="dn" style="color:${l >= 3 ? 'rgba(0,0,0,.55)' : 'var(--mute)'}">${parse(s).getDate()}</span></span>`;
+  }) + `<div class="legend">${['0', '< 1 h', '1–2 h', '2–4 h', '4 h +'].map((x, i) => `<span><i style="background:${HC[i]}"></i>${x}</span>`).join('')}</div></div>`;
+
+  // sessions
+  const ss = [...S.work.sessions].sort((a, b) => b.start - a.start).slice(0, 15);
+  h += `<div class="card"><h3><span class="lbl">Sessions récentes</span><button class="lbl" style="color:var(--ice)" data-a="addSess">+ Ajouter</button></h3>
+    ${ss.length ? ss.map(x => `<button class="sess" data-a="editSess" data-v="${x.id}"><span class="d"><b>${esc(x.tag || 'Sans étiquette')}</b><br><span class="dim" style="font-size:12.5px">${fmtDate(x.date)} · ${new Date(x.start).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span></span><span class="v">${fmtDur(x.ms)}</span></button>`).join('') : `<p class="muted" style="margin:0">Aucune session pour l’instant. Lance le chrono !</p>`}</div>`;
+  return h;
+}
+
+/* ---------- sheets ---------- */
+function openSheet(html) { document.getElementById('sheet').innerHTML = `<div class="grab"></div>` + html; document.getElementById('ov').classList.add('on'); }
+function closeSheet() { document.getElementById('ov').classList.remove('on'); }
+function toast(m) { const t = document.getElementById('toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', 2400); }
+
+function daySheet(s) {
+  const n = dayCount(s), f = form(s), ed = editable(s);
+  openSheet(`<h2>${fmtDateL(s)}</h2><div class="between" style="margin-bottom:12px"><span class="lbl">Jour ${arcDay(s)} / 92</span><span class="pill"><span class="sw" style="background:${COLV[colorOf(n)]}"></span>${n}/8 · ${COLN[colorOf(n)]}</span></div>
+    <div class="habits">${HABITS.map(x => { const st = habit(s, x.id);
+      return `<div class="h ${st.done ? 'done' : ''}" style="min-height:48px"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><div class="m"><div class="n">${x.n}</div>${st.txt ? `<div class="sub">${esc(st.txt)}</div>` : ''}</div>${st.src === 'garmin' ? '<span class="tag g">GARMIN</span>' : st.src === 'manuel' ? '<span class="tag">MANUEL</span>' : ''}</div>`; }).join('')}</div>
+    <div class="grid3" style="margin-top:12px"><div class="stat"><div class="v">${f ? f.score : '—'}</div><div class="s">Forme</div></div><div class="stat"><div class="v">${fmtDur(workMs(s)).replace(' h ', 'h')}</div><div class="s">Travail</div></div><div class="stat"><div class="v">${(ACTS(s)).reduce((a, x) => a + x.min, 0)}<small> min</small></div><div class="s">Sport</div></div></div>
+    ${ed ? '' : '<p class="help">Jour clos : les cases ne se modifient plus (sauf hier jusqu’à 10 h).</p>'}`);
+}
+
+function settingsSheet() {
+  const s = REAL.settings, g = REAL.garmin;
+  openSheet(`<h2>Réglages</h2>
+    <div class="field"><label class="lbl" for="k2">Clé API Intervals.icu</label><input id="k2" type="password" autocomplete="off" value="${esc(s.apiKey)}" placeholder="Colle ta clé">
+      <div class="help">intervals.icu → Settings → Developer Settings. La clé reste sur ce téléphone.</div></div>
+    <div class="field"><label class="lbl" for="ath2">ID athlète</label><input id="ath2" value="${esc(s.athlete)}"></div>
+    <button class="btn pri sm" data-a="saveKey" style="width:100%">Enregistrer et synchroniser</button>
+    <p class="help">${g.lastSync ? `Dernière synchro : ${new Date(g.lastSync).toLocaleString('fr-FR')} · ${Object.keys(g.wellness).length} jours de données` : 'Pas encore synchronisé.'}${g.error ? ` · <span style="color:var(--bad)">${esc(g.error)}</span>` : ''}</p>
+    <div class="field"><label class="lbl" for="tags">Étiquettes du chrono (séparées par des virgules)</label><input id="tags" value="${esc(s.tags.join(', '))}"></div>
+    <button class="btn sm" data-a="saveTags" style="width:100%">Enregistrer les étiquettes</button>
+    <div class="sec lbl">Sauvegarde</div>
+    <div class="help" style="margin-bottom:10px">Tes cases et sessions sont stockées sur ce téléphone. Exporte une sauvegarde de temps en temps (Fichiers / iCloud Drive).</div>
+    <div class="btns"><button class="btn sm" data-a="export">Exporter</button><label class="btn sm" style="cursor:pointer">Importer<input type="file" accept="application/json" id="imp" hidden></label></div>
+    <div class="sec lbl">Démo</div>
+    <button class="btn sm" data-a="demo" style="width:100%">${isDemo() ? 'Quitter la démo' : 'Voir la démo (jour 40)'}</button>
+    <p class="help" style="margin-top:18px">Winter Arc · 1er oct. → 31 déc. 2026 · v1</p>`);
+  const imp = document.getElementById('imp');
+  imp.addEventListener('change', async () => {
+    const f = imp.files[0]; if (!f) return;
+    try { const d = JSON.parse(await f.text()); if (!d.days || !d.work) throw 0;
+      if (!confirm('Remplacer les données de ce téléphone par cette sauvegarde ?')) return;
+      const b = blank(); REAL = { ...b, ...d, settings: { ...b.settings, ...d.settings, setup: true } }; S = REAL; save(); closeSheet(); render(); toast('Sauvegarde importée');
+    } catch (e) { toast('Fichier de sauvegarde invalide'); }
+  });
+}
+
+function sessSheet(x) {
+  const isNew = !x; x = x || { date: today(), ms: 60 * 60000, tag: S.settings.tags[0] };
+  openSheet(`<h2>${isNew ? 'Ajouter une session' : 'Modifier la session'}</h2>
+    <div class="field"><label class="lbl">Date</label><input id="sd" type="date" min="${ARC_START}" max="${ARC_END}" value="${x.date}"></div>
+    <div class="field"><label class="lbl">Durée (minutes)</label><input id="sm" type="number" inputmode="numeric" min="1" value="${Math.round(x.ms / 60000)}"></div>
+    <div class="field"><label class="lbl">Étiquette</label><select id="st">${S.settings.tags.map(t => `<option ${t === x.tag ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>
+    <div class="btns"><button class="btn pri" data-a="saveSess" data-v="${isNew ? '' : x.id}">Enregistrer</button>${isNew ? '' : `<button class="btn dng" data-a="delSess" data-v="${x.id}">Supprimer</button>`}</div>`);
+}
+
+/* =========================================================
+   ACTIONS
+   ========================================================= */
+const A = {
+  tab: el => { view = el.dataset.t; window.scrollTo(0, 0); render(); },
+  closeov: (el, e) => { if (e.target.id === 'ov') closeSheet(); },
+  sync: () => { if (isDemo()) return toast('Mode démo'); if (!S.settings.apiKey) return settingsSheet(); sync(true); },
+  settings: () => settingsSheet(),
+  check: el => { const s = el.dataset.d; if (!editable(s)) return toast('Jour clos'); const d = dayObj(s); d[el.dataset.h] = !d[el.dataset.h]; save(); render(); },
+  water: el => { const s = el.dataset.d; if (!editable(s)) return toast('Jour clos'); const d = dayObj(s); d.water = clamp((d.water || 0) + Number(el.dataset.v), 0, 5000); save(); render(); },
+  auto: el => {
+    const s = el.dataset.d, id = el.dataset.h, st = habit(s, id);
+    if (st.src === 'garmin') return toast('Validé automatiquement par Garmin');
+    if (!editable(s)) return toast('Jour clos');
+    const d = dayObj(s); d.ov = d.ov || {};
+    if (d.ov[id]) { delete d.ov[id]; save(); render(); return; }
+    if (confirm(`Valider « ${HN[id]} » manuellement ?\nÀ utiliser seulement si Garmin n’a pas remonté la donnée (montre oubliée, synchro en panne).`)) { d.ov[id] = true; save(); render(); }
+  },
+  tag: el => { const v = el.dataset.v; S.settings.lastTag = v; if (S.work.running) S.work.running.tag = v; save(); render(); },
+  cStart: () => chronoStart(), cPause: () => chronoPause(), cStop: () => chronoStop(),
+  keepRun: () => { const r = S.work.running; if (r) r.ask = elapsed(r) + 3 * 3600e3; save(); closeSheet(); },
+  cutRun: () => { const m = Number(document.getElementById('cutMin').value); closeSheet(); chronoStop(m > 0 ? m * 60000 : null); },
+  day: el => daySheet(el.dataset.d),
+  wk: el => { const ws = weeks(); const i = ws.indexOf(weekSel) + Number(el.dataset.v); if (ws[i]) { weekSel = ws[i]; render(); } },
+  addSess: () => sessSheet(null),
+  editSess: el => sessSheet(S.work.sessions.find(x => x.id === el.dataset.v)),
+  saveSess: el => {
+    const date = document.getElementById('sd').value, m = Number(document.getElementById('sm').value), tag = document.getElementById('st').value;
+    if (!date || !(m > 0)) return toast('Date et durée requises');
+    if (el.dataset.v) { const x = S.work.sessions.find(y => y.id === el.dataset.v); Object.assign(x, { date, ms: m * 60000, tag }); }
+    else { const st = parse(date); st.setHours(12); S.work.sessions.push({ id: Date.now().toString(36), date, start: st.getTime(), ms: m * 60000, tag }); }
+    save(); closeSheet(); render();
+  },
+  delSess: el => { if (!confirm('Supprimer cette session ?')) return; S.work.sessions = S.work.sessions.filter(x => x.id !== el.dataset.v); save(); closeSheet(); render(); },
+  connect: async () => {
+    const k = document.getElementById('k').value.trim(), a = document.getElementById('ath').value.trim() || '0', err = document.getElementById('cerr');
+    if (!k) { err.textContent = 'Colle ta clé API.'; return; }
+    err.style.color = 'var(--tx2)'; err.textContent = 'Connexion à Intervals.icu…';
+    REAL.settings.apiKey = k; REAL.settings.athlete = a; S = REAL;
+    await sync(true);
+    if (REAL.garmin.error) { err.style.color = 'var(--bad)'; err.textContent = REAL.garmin.error + '. Vérifie la clé.'; REAL.settings.apiKey = ''; renderOnboarding(); document.getElementById('cerr').textContent = REAL.garmin.error + '. Vérifie la clé.'; return; }
+    REAL.settings.setup = true; view = 'today'; save(); try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+    render(); toast('Garmin relié ✓');
+  },
+  saveKey: () => { REAL.settings.apiKey = document.getElementById('k2').value.trim(); REAL.settings.athlete = document.getElementById('ath2').value.trim() || '0'; REAL.garmin.error = ''; save(); closeSheet(); if (!isDemo()) sync(true); else toast('Enregistré (quitte la démo pour synchroniser)'); },
+  saveTags: () => { const t = document.getElementById('tags').value.split(',').map(x => x.trim()).filter(Boolean).slice(0, 8); if (!t.length) return toast('Au moins une étiquette'); REAL.settings.tags = t; if (DEMO) DEMO.settings.tags = t; save(); closeSheet(); render(); },
+  export: async () => {
+    const blob = new Blob([JSON.stringify(REAL, (k, v) => k === 'apiKey' ? undefined : v, 1)], { type: 'application/json' });
+    const name = `winter-arc-sauvegarde-${ymd(new Date())}.json`;
+    try { const file = new File([blob], name, { type: 'application/json' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Sauvegarde Winter Arc' }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  },
+  demo: () => { closeSheet(); if (isDemo()) return A.exitDemo(); DEMO = makeDemo(); S = DEMO; view = 'today'; weekSel = null; render(); },
+  exitDemo: () => { S = REAL; DEMO = null; weekSel = null; view = 'today'; render(); },
+};
+document.addEventListener('click', e => { const el = e.target.closest('[data-a]'); if (!el) return; e.stopPropagation(); A[el.dataset.a] && A[el.dataset.a](el, e); });
+
+/* tick du chrono : met à jour l'horloge sans tout redessiner */
+function setTick() {
+  clearInterval(tickT);
+  if (S.work.running && S.work.running.seg) tickT = setInterval(() => {
+    const c = document.getElementById('clock'); if (c) c.textContent = fmtClock(elapsed(S.work.running));
+    const t = document.getElementById('tot'); if (t) t.textContent = fmtDur(workTotal());
+    if (S.work.running && elapsed(S.work.running) > S.work.running.ask) checkLongRun();
+  }, 1000);
+}
+
+/* =========================================================
+   DÉMO (données fictives, jour 40 = 9 nov.)
+   ========================================================= */
+function makeDemo() {
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const D = blank(); D.settings = { ...REAL.settings, apiKey: 'demo', setup: true };
+  const T = '2026-11-09';
+  range(addDays(ARC_START, -35), T).forEach((s, i) => {
+    const tired = rnd() < .1;
+    const sl = tired ? 6.3 + rnd() : 7.45 + rnd() * 1.1;
+    D.garmin.wellness[s] = { steps: s === T ? 6240 : Math.round(7500 + rnd() * 6500), sleepSecs: Math.round(sl * 3600), sleepScore: Math.round(clamp(55 + (sl - 6.5) * 18 + rnd() * 8)),
+      hrv: Math.round((tired ? 52 : 62) + rnd() * 10), restingHR: Math.round((tired ? 55 : 51) + rnd() * 3), bb: null, readiness: null, atl: 55 + rnd() * 15, ctl: 52 };
+    if (s >= ARC_START) {
+      const wd = parse(s).getDay(); const rest = rnd() < .14;
+      const types = [['Course', 50], ['Muscu', 65], ['Vélo', 60], ['Muscu', 60], ['Muscu', 55], ['Fonctionnel', 70], ['Course', 45]];
+      if (s !== T || true) { const ty = types[wd]; D.garmin.activities[s] = [rest ? { label: 'Marche', min: 30, load: 8 } : { label: ty[0], min: ty[1] + Math.round(rnd() * 15), load: Math.round(45 + rnd() * 50) }]; }
+      if (s < T) {
+        const p = .82 + (i % 7 === 5 ? -.15 : 0);
+        D.days[s] = { supps: rnd() < p + .08, chore: rnd() < p - .05, room: rnd() < p, me: rnd() < p - .1, water: rnd() < p - .1 ? 1500 + Math.round(rnd() * 2) * 500 : 1000 };
+        const n = Math.floor(rnd() * 3); for (let k = 0; k < n + (wd > 0 && wd < 6 ? 1 : 0); k++) D.work.sessions.push({ id: s + k, date: s, start: parse(s).getTime() + (9 + k * 3) * 3600e3, ms: Math.round((40 + rnd() * 110)) * 60000, tag: ['Cours', 'Projet', 'Perso'][Math.floor(rnd() * 3)] });
+      }
+    }
+  });
+  D.garmin.activities[T] = [];
+  D.days[T] = { supps: true, water: 1000 };
+  D.days['2026-11-08'].water = 500; D.days['2026-11-08'].room = false; D.days['2026-11-07'].room = false;
+  D.garmin.lastSync = Date.now();
+  return D;
+}
+
+/* =========================================================
+   DÉMARRAGE
+   ========================================================= */
+render();
+sync(false);
+checkLongRun();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { render(); sync(false); checkLongRun(); } });
+setInterval(() => { if (document.visibilityState === 'visible') sync(false); }, 15 * 60e3);
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
