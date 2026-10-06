@@ -1,5 +1,5 @@
 // Winter Arc — service worker : l'app marche hors ligne, les données Garmin passent toujours par le réseau.
-const CACHE = 'winter-arc-v1';
+const CACHE = 'winter-arc-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {

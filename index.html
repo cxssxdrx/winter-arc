@@ -48,7 +48,7 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:12p
 .topR{display:flex;align-items:center;gap:8px}
 .sync{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tx2);background:var(--s1);border:1px solid var(--line);padding:7px 10px;border-radius:999px}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--mute);flex:none}
-.dot.ok{background:var(--good);box-shadow:0 0 8px var(--good)} .dot.busy{background:var(--ice);animation:pulse 1s infinite} .dot.err{background:var(--bad)}
+.dot.ok{background:var(--good);box-shadow:0 0 8px var(--good)} .dot.busy{background:var(--ice);animation:pulse 1s infinite} .dot.warn{background:var(--warn)} .dot.err{background:var(--bad)}
 @keyframes pulse{50%{opacity:.3}}
 .iconbtn{width:38px;height:38px;border-radius:12px;background:var(--s1);border:1px solid var(--line);display:grid;place-items:center}
 .iconbtn svg{width:19px;height:19px;stroke:var(--tx2)}
@@ -363,40 +363,84 @@ const zoneOf = sc => sc >= 70 ? { c: 'good', n: 'Feu vert', r: 'Séance prévue 
 /* =========================================================
    SYNCHRO INTERVALS.ICU (Garmin → Intervals.icu → app)
    ========================================================= */
+/* Erreurs réseau : Safari dit « Load failed », Chrome « Failed to fetch ». */
+const isNetErr = e => e && (e.name === 'TypeError' || /load failed|failed to fetch|network/i.test(e.message || ''));
+async function getJSON(url, head, tries = 3) {
+  let last;
+  for (let i = 0; i < tries; i++) {
+    const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 20000);
+    try {
+      const r = await fetch(url, { headers: head, signal: ctl.signal, cache: 'no-store' });
+      clearTimeout(to);
+      if (r.status === 401 || r.status === 403) { const e = new Error('Clé API refusée'); e.fatal = true; throw e; }
+      if (!r.ok) throw new Error(`Intervals.icu a répondu ${r.status}`);
+      const j = await r.json();
+      if (!Array.isArray(j)) throw new Error('Réponse inattendue d’Intervals.icu');
+      return j;
+    } catch (e) {
+      clearTimeout(to); last = e;
+      if (e.fatal) throw e;
+      if (i < tries - 1) await new Promise(r => setTimeout(r, 1500 * (i + 1)));
+    }
+  }
+  if (last && last.name === 'AbortError') throw new Error('Intervals.icu ne répond pas (délai dépassé)');
+  if (isNetErr(last)) throw new Error(navigator.onLine === false ? 'Pas de réseau' : 'Intervals.icu injoignable');
+  throw last;
+}
+function apiBase() { return { base: `https://intervals.icu/api/v1/athlete/${encodeURIComponent(S.settings.athlete || '0')}`,
+  head: { Authorization: 'Basic ' + btoa('API_KEY:' + S.settings.apiKey.trim()), Accept: 'application/json' } }; }
+
 async function sync(force) {
   if (isDemo() || syncing || !S.settings.apiKey) return;
   if (!force && Date.now() - S.garmin.lastSync < 5 * 60e3) return;
   syncing = true; renderTop();
-  try {
-    const t = today(), id = encodeURIComponent(S.settings.athlete || '0');
-    const head = { Authorization: 'Basic ' + btoa('API_KEY:' + S.settings.apiKey.trim()), Accept: 'application/json' };
-    const base = `https://intervals.icu/api/v1/athlete/${id}`;
-    const oldestW = addDays(ARC_START, -35);
-    const [wr, ar] = await Promise.all([
-      fetch(`${base}/wellness?oldest=${oldestW}&newest=${t}`, { headers: head }),
-      fetch(`${base}/activities?oldest=${addDays(ARC_START, -1)}&newest=${addDays(t, 1)}`, { headers: head }),
-    ]);
-    if (wr.status === 401 || wr.status === 403) throw new Error('Clé API refusée');
-    if (!wr.ok || !ar.ok) throw new Error(`Intervals.icu indisponible (${wr.status}/${ar.status})`);
-    const wl = await wr.json(), al = await ar.json();
-    const wellness = {};
-    (wl || []).forEach(x => {
-      const n = v => (v == null || v === '' ? null : Number(v));
-      wellness[x.id] = { steps: n(x.steps), sleepSecs: n(x.sleepSecs), sleepScore: n(x.sleepScore), hrv: n(x.hrv), restingHR: n(x.restingHR),
-        bb: n(x.bodyBattery ?? x.body_battery), readiness: n(x.readiness), atl: n(x.atl), ctl: n(x.ctl) };
-    });
-    const acts = {};
-    (al || []).forEach(a => {
+  const g = REAL.garmin, t = today(), { base, head } = apiBase();
+  // synchro complète 1×/jour, sinon seulement les 10 derniers jours (requêtes plus légères)
+  const full = !g.lastFull || ymd(new Date(g.lastFull)) !== ymd(new Date()) || force === 'full';
+  const oldW = full ? addDays(ARC_START, -35) : addDays(t, -10);
+  const oldA = full ? addDays(ARC_START, -1) : addDays(t, -10);
+  const [wr, ar] = await Promise.allSettled([
+    getJSON(`${base}/wellness?oldest=${oldW}&newest=${t}`, head),
+    getJSON(`${base}/activities?oldest=${oldA}&newest=${addDays(t, 1)}`, head),
+  ]);
+  const n = v => (v == null || v === '' ? null : Number(v));
+  if (wr.status === 'fulfilled') wr.value.forEach(x => { if (!x || !x.id) return;
+    g.wellness[x.id] = { steps: n(x.steps), sleepSecs: n(x.sleepSecs), sleepScore: n(x.sleepScore), hrv: n(x.hrv), restingHR: n(x.restingHR),
+      bb: n(x.bodyBattery ?? x.body_battery), readiness: n(x.readiness), atl: n(x.atl), ctl: n(x.ctl) }; });
+  if (ar.status === 'fulfilled') {
+    for (const d of Object.keys(g.activities)) if (d >= oldA) delete g.activities[d];
+    ar.value.forEach(a => { if (!a) return;
       const d = (a.start_date_local || '').slice(0, 10); if (!d) return;
       const secs = a.moving_time || a.elapsed_time || 0;
-      (acts[d] = acts[d] || []).push({ label: ACT_FR[a.type] || a.type || 'Activité', name: a.name || '', min: Math.round(secs / 60),
-        load: a.icu_training_load || 0, rpe: a.icu_rpe || a.perceived_exertion || null });
-    });
-    REAL.garmin = { wellness, activities: acts, lastSync: Date.now(), error: '' };
-    save();
-  } catch (e) {
-    REAL.garmin.error = e.message === 'Failed to fetch' ? 'Pas de réseau' : e.message; save();
-  } finally { syncing = false; render(); }
+      (g.activities[d] = g.activities[d] || []).push({ label: ACT_FR[a.type] || a.type || 'Activité', name: a.name || '', min: Math.round(secs / 60),
+        load: a.icu_training_load || 0, rpe: a.icu_rpe || a.perceived_exertion || null }); });
+  }
+  const errs = [wr, ar].filter(x => x.status === 'rejected').map(x => x.reason && x.reason.message || 'Erreur inconnue');
+  if (errs.length < 2) { g.lastSync = Date.now(); if (full && !errs.length) g.lastFull = Date.now(); }
+  g.error = errs.length ? errs[0] + (errs.length === 1 ? (wr.status === 'rejected' ? ' (bien-être)' : ' (activités)') : '') : '';
+  g.errAt = errs.length ? Date.now() : 0; g.partial = errs.length === 1;
+  save(); syncing = false; render();
+}
+
+/* Diagnostic : teste chaque appel et affiche le détail exact */
+async function diagnose() {
+  const out = document.getElementById('diag'); if (!out) return;
+  const line = (ok, txt) => `<div class="vline"><span class="ic" style="color:${ok ? 'var(--good)' : 'var(--bad)'}">${ok ? '✓' : '✗'}</span><span>${txt}</span></div>`;
+  out.innerHTML = '<p class="help">Test en cours…</p>';
+  const res = [line(navigator.onLine !== false, `Réseau du téléphone : ${navigator.onLine === false ? 'hors ligne' : 'en ligne'}`)];
+  try { const t0 = performance.now(); const r = await fetch('https://intervals.icu/api/v1/athlete/0', { cache: 'no-store' });
+    res.push(line(true, `Intervals.icu joignable (HTTP ${r.status} sans clé, ${Math.round(performance.now() - t0)} ms)`)); }
+  catch (e) { res.push(line(false, `Intervals.icu injoignable sans clé : ${esc(e.name)} « ${esc(e.message)} »`)); }
+  if (!REAL.settings.apiKey) res.push(line(false, 'Aucune clé API enregistrée'));
+  else { const { base, head } = apiBase(), t = today();
+    for (const [k, u] of [['Bien-être (sommeil, pas, VFC)', `${base}/wellness?oldest=${addDays(t, -2)}&newest=${t}`], ['Activités', `${base}/activities?oldest=${addDays(t, -2)}&newest=${addDays(t, 1)}`]]) {
+      try { const t0 = performance.now(); const r = await fetch(u, { headers: head, cache: 'no-store' }); let extra = '';
+        if (r.ok) { const j = await r.json(); extra = Array.isArray(j) ? ` · ${j.length} élément(s)` : ' · format inattendu';
+          if (k.startsWith('Bien') && Array.isArray(j)) { const x = j.find(y => y.id === t); extra += x ? ` · aujourd’hui : pas ${x.steps ?? '—'}, sommeil ${x.sleepSecs ? fmtH(x.sleepSecs) : '—'}` : ' · rien pour aujourd’hui (Garmin pas encore remonté)'; } }
+        res.push(line(r.ok, `${k} : HTTP ${r.status}${r.status === 401 || r.status === 403 ? ' (clé refusée)' : ''}${extra} · ${Math.round(performance.now() - t0)} ms`)); }
+      catch (e) { res.push(line(false, `${k} : ${esc(e.name)} « ${esc(e.message)} »`)); } } }
+  res.push(`<p class="help">${new Date().toLocaleString('fr-FR')} · fais une capture d’écran de ce résultat si le problème persiste.</p>`);
+  out.innerHTML = `<div class="verdict">${res.join('')}</div>`;
 }
 
 /* =========================================================
@@ -452,6 +496,8 @@ function renderTop() {
   if (isDemo()) { st = 'Démo'; cls = 'ok'; }
   else if (!S.settings.apiKey) { st = 'Garmin non relié'; cls = 'err'; }
   else if (syncing) { st = 'Synchro…'; cls = 'busy'; }
+  else if (g.error && g.partial) { st = 'Synchro partielle'; cls = 'warn'; }
+  else if (g.error && g.lastSync && Date.now() - g.lastSync < 36 * 3600e3) { const m = Math.round((Date.now() - g.lastSync) / 60000); st = `Hors ligne · ${m < 60 ? m + ' min' : Math.round(m / 60) + ' h'}`; cls = 'warn'; }
   else if (g.error) { st = g.error; cls = 'err'; }
   else if (g.lastSync) { const m = Math.round((Date.now() - g.lastSync) / 60000); st = m < 1 ? 'À jour' : m < 60 ? `il y a ${m} min` : `il y a ${Math.round(m / 60)} h`; cls = 'ok'; }
   else { st = 'Jamais synchronisé'; cls = ''; }
@@ -771,6 +817,8 @@ function settingsSheet() {
     <div class="field"><label class="lbl" for="ath2">ID athlète</label><input id="ath2" value="${esc(s.athlete)}"></div>
     <button class="btn pri sm" data-a="saveKey" style="width:100%">Enregistrer et synchroniser</button>
     <p class="help">${g.lastSync ? `Dernière synchro : ${new Date(g.lastSync).toLocaleString('fr-FR')} · ${Object.keys(g.wellness).length} jours de données` : 'Pas encore synchronisé.'}${g.error ? ` · <span style="color:var(--bad)">${esc(g.error)}</span>` : ''}</p>
+    <div class="btns"><button class="btn sm" data-a="diag">Diagnostic</button><button class="btn sm" data-a="fullSync">Tout recharger</button></div>
+    <div id="diag" style="margin-top:10px"></div>
     <div class="field"><label class="lbl" for="tags">Étiquettes du chrono (séparées par des virgules)</label><input id="tags" value="${esc(s.tags.join(', '))}"></div>
     <button class="btn sm" data-a="saveTags" style="width:100%">Enregistrer les étiquettes</button>
     <div class="sec lbl">Sauvegarde</div>
@@ -778,7 +826,7 @@ function settingsSheet() {
     <div class="btns"><button class="btn sm" data-a="export">Exporter</button><label class="btn sm" style="cursor:pointer">Importer<input type="file" accept="application/json" id="imp" hidden></label></div>
     <div class="sec lbl">Démo</div>
     <button class="btn sm" data-a="demo" style="width:100%">${isDemo() ? 'Quitter la démo' : 'Voir la démo (jour 40)'}</button>
-    <p class="help" style="margin-top:18px">Winter Arc · 1er oct. → 31 déc. 2026 · v1</p>`);
+    <p class="help" style="margin-top:18px">Winter Arc · 1er oct. → 31 déc. 2026 · v1.1</p>`);
   const imp = document.getElementById('imp');
   imp.addEventListener('change', async () => {
     const f = imp.files[0]; if (!f) return;
@@ -804,8 +852,10 @@ function sessSheet(x) {
 const A = {
   tab: el => { view = el.dataset.t; window.scrollTo(0, 0); render(); },
   closeov: (el, e) => { if (e.target.id === 'ov') closeSheet(); },
-  sync: () => { if (isDemo()) return toast('Mode démo'); if (!S.settings.apiKey) return settingsSheet(); sync(true); },
+  sync: () => { if (isDemo()) return toast('Mode démo'); if (!S.settings.apiKey) return settingsSheet(); if (REAL.garmin.error && !syncing) { settingsSheet(); diagnose(); } sync(true); },
   settings: () => settingsSheet(),
+  diag: () => diagnose(),
+  fullSync: () => { if (isDemo()) return toast('Mode démo'); closeSheet(); sync('full'); },
   check: el => { const s = el.dataset.d; if (!editable(s)) return toast('Jour clos'); const d = dayObj(s); d[el.dataset.h] = !d[el.dataset.h]; save(); render(); },
   water: el => { const s = el.dataset.d; if (!editable(s)) return toast('Jour clos'); const d = dayObj(s); d.water = clamp((d.water || 0) + Number(el.dataset.v), 0, 5000); save(); render(); },
   auto: el => {
